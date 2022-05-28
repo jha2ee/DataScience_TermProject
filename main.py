@@ -1,4 +1,5 @@
 # 1. importing library
+from codecs import ignore_errors
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -13,6 +14,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder 
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix
+import warnings 
+warnings.filterwarnings("ignore")
 
 # 2. Reading the dataset (heart_2020_cleaned.csv) 
 df = pd.read_csv("heart_2020_cleaned.csv")
@@ -38,7 +41,7 @@ print(df.nunique())
 # Conservative judgment is made on the criteria for health with respect to Diabetic
 df['Diabetic'] = df['Diabetic'].fillna(value='Yes')
 # Smoking, AlcoholDrinking, Stroke, DiffWalking, Sex have 2 values, so use replace function to (1, 0)
-df =  df[df.columns].replace({'Yes':1, 'No':0, 'Male':1,'Female':0,'No, borderline diabetes':'0','Yes (during pregnancy)':'1' })
+df =  df[df.columns].replace({'Yes':1, 'No':0, 'Male':1,'Female':0})
 # Use the median of category range to use the age category information, which is categorical data, as numerically
 df['AgeCategory'] = df['AgeCategory'].replace('18-24', 21)
 df['AgeCategory'] = df['AgeCategory'].replace('25-29', 27)
@@ -53,6 +56,7 @@ df['AgeCategory'] = df['AgeCategory'].replace('65-69', 67)
 df['AgeCategory'] = df['AgeCategory'].replace('70-74', 72)
 df['AgeCategory'] = df['AgeCategory'].replace('75-79', 77)
 df['AgeCategory'] = df['AgeCategory'].replace('80 or older', 80)
+
 
 # 6. Data Visualization
 # 1) Visualization of Categorical features
@@ -140,6 +144,7 @@ fig.suptitle("Distribution of heart disease based on previous exposure to Diabet
 
 ax.legend();
 
+
 # 2) Visualization of Numerical Features
 # BMI
 fig, ax = plt.subplots(figsize = (13,5))
@@ -190,6 +195,7 @@ plt.title('Heatmap correlation of features')
 abs(correlation['HeartDisease']).sort_values()[:-1].plot.barh()
 plt.show()
 
+
 """
 Data preprocessing
 """
@@ -230,113 +236,92 @@ def RobustScaling(columnName,df):
 stTrainData=StandardScaling(['BMI','PhysicalHealth','MentalHealth','AgeCategory','SleepTime'],df)
 mmTrainData=MinMaxScaling(['BMI','PhysicalHealth','MentalHealth','AgeCategory','SleepTime'],df)
 rbTrainData=RobustScaling(['BMI','PhysicalHealth','MentalHealth','AgeCategory','SleepTime'],df)
+#print(stTrainData.head())
+#print(mmTrainData.head())
+#print(rbTrainData.head())
 
 # 7. Encoding for data(for categorical data)
 enc = OneHotEncoder() 
 
 # Encoding categorical features - dataframe name : categ
-encoded_categ = mmTrainData[['Race', 'GenHealth']]
+encoded_categ = stTrainData[['Race', 'GenHealth']]
 encoded_categ = pd.DataFrame(enc.fit_transform(encoded_categ).toarray())
 # Linking the encoed_cateh with the df
-encoded_categ = pd.concat([mmTrainData, encoded_categ], axis = 1)
+encoded_categ = pd.concat([stTrainData, encoded_categ], axis = 1)
 # Dropping the categorical features after encoding
 encoded_categ = encoded_categ.drop(columns = ['Race', 'GenHealth'], axis = 1)
 
-
-
-# 8. Split train dataset and test dataset
+# 8. Prepare for split train dataset and test dataset
 size = 0.2
 data = encoded_categ.drop(['HeartDisease'], axis=1) # drop target data
 target = encoded_categ['HeartDisease']
-x_train, x_valid, y_train, y_valid = train_test_split(data, target, test_size=size, random_state=34, stratify = target, shuffle=True)
-# for checking
-print('Shape of training feature:', x_train.shape)
-print('Shape of testing feature:', x_valid.shape)
-print('Shape of training label:', y_train.shape)
-print('Shape of training label:', y_valid.shape)
 
 
 # 9. Build a model
-"""
-name : evaluate_model
-input : model, x_test, y_test
-result : accuracy information with model
-"""
-def evaluate_model(model, x_test, y_test):
-    from sklearn import metrics
-
-    # Predict Test Data 
-    y_pred = model.predict(x_test)
-
-    # Calculate accuracy, precision, recall, f1-score, and kappa score
-    acc = metrics.accuracy_score(y_test, y_pred)
-    prec = metrics.precision_score(y_test, y_pred)
-    rec = metrics.recall_score(y_test, y_pred)
-    f1 = metrics.f1_score(y_test, y_pred)
-
-    # Calculate area under curve (AUC)
-    y_pred_proba = model.predict_proba(x_test)[::,1]
-    fpr, tpr, _ = metrics.roc_curve(y_test, y_pred_proba)
-    auc = metrics.roc_auc_score(y_test, y_pred_proba)
-
-    # Display confussion matrix
-    cm = metrics.confusion_matrix(y_test, y_pred)
-
-    return {'acc': acc, 'prec': prec, 'rec': rec, 'f1': f1, 
-            'fpr': fpr, 'tpr': tpr, 'auc': auc, 'cm': cm}
-
-
-# 1) KNN classifier model
-knn = KNeighborsClassifier(n_neighbors = 5)
-# kfold = KFold(5, shuffle=True)
-knn.fit(x_train, y_train)
-knn_eval = evaluate_model(knn, x_valid, y_valid)
-
-print('Accuracy:', knn_eval['acc'])
-print('Precision:', knn_eval['prec']) # 분류기가 참으로 분류한 결과 중에서 실제 참의 비율
-print('Recall:', knn_eval['rec']) # 실제 참 중에서 분류기가 참으로 분류한 비율
-print('F1 Score:', knn_eval['f1']) # Precision과 Recall의 조화평균으로 주로 분류 클래스 간 데이터가 심각한 불균형을 이루는 경우에 사용
-print('Area Under Curve:', knn_eval['auc'])
-print('Confusion Matrix:\n', knn_eval['cm'])
-
+########################################
+# 1) Decision Tree model & KFold validation
 from sklearn import tree
+from sklearn import metrics
+from sklearn.metrics import roc_curve
+from sklearn.model_selection import cross_val_score
 
-# 2) Decision Tree model 
-dc = tree.DecisionTreeClassifier(random_state=0)
-dc.fit(x_train, y_train)
-dc_eval = evaluate_model(dc, x_valid, y_valid)
+from sklearn.model_selection import KFold
 
-# Print result
-print('Accuracy:', dc_eval['acc'])
-print('Precision:', dc_eval['prec'])
-print('Recall:', dc_eval['rec'])
-print('F1 Score:', dc_eval['f1'])
-print('Area Under Curve:', dc_eval['auc'])
-print('Confusion Matrix:\n', dc_eval['cm'])
+train_x, test_x, train_y, test_y = train_test_split(data, target, test_size=size, random_state=34, stratify = target, shuffle=True)
+kfold = KFold(5, shuffle=True)
+model = tree.DecisionTreeClassifier()
+score = cross_val_score(model, X=train_x, y=train_y, cv=kfold)
+print("cross validation scroes: {}".format(score))
+print("Mean score: {}".format(np.mean(score)))
 
-# 3) Linear Regression
-# reg = LinearRegression()
-# kfold = KFold(5, shuffle=True)
+model.fit(train_x, train_y)
+pred_y = model.predict(test_x)
+fper, tper, thresholds = roc_curve(test_y, pred_y)
+score = metrics.roc_auc_score(test_y,pred_y)
+print(score)
+# 10. Model evalution
+# 1) Confusion matrix
+cm = confusion_matrix(test_y, pred_y)
+matrix = pd.DataFrame(data = cm, columns = ['Predicted:0', 'Predicted:1'], index = ['Actual:0', 'Actual:1'])
+plt.figure(figsize = (8, 5))
+sns.heatmap(matrix, annot=True, fmt='d')
+plt.show()
+# 2) ROC curve
+def plot_roc_curve(fper, tper):
+    plt.plot(fper, tper, color='red', label='ROC')
+    plt.plot([0, 1], [0, 1], color='green', linestyle='--')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic Curve')
+    plt.legend()
+    plt.show()
 
+plot_roc_curve(fper, tper)
 
+########################################
+# 2) KNN classifier model & GridSearchCV
+from sklearn.model_selection import GridSearchCV
+
+knn = KNeighborsClassifier()
+train_x, test_x, train_y, test_y = train_test_split(data, target, test_size=size, random_state=34, stratify = target, shuffle=True)
+h_para = {'n_neighbors':np.arange(1, 10, 5)}
+
+grid_knn = GridSearchCV(knn, param_grid=h_para, cv=KFold(5, shuffle=True), refit=True, scoring = "accuracy", return_train_score=True, n_jobs=-1)
+grid_knn.fit(train_x, train_y)
+pred_y = grid_knn.predict(test_x)
+fper, tper, thresholds = roc_curve(test_y, pred_y)
+print('final params: ', grid_knn.best_params_)
+print('best score: ', grid_knn.best_score_)
+print('best estimator: ', grid_knn.best_estimator_)
 
 # 10. Model evalution
 # 1) Confusion matrix
-data = {'y_Predicted': knn.predict(x_valid), 'y_Actual': y_valid}
-df = pd.DataFrame(data,
-columns=['y_Actual','y_Predicted'])
-confusion_matrix = pd.crosstab(df['y_Actual'],
-df['y_Predicted'], rownames=['Actual'],
-colnames=['Predicted'], margins = True)
-sns.heatmap(confusion_matrix, annot=True)
+cm = confusion_matrix(test_y, pred_y)
+matrix = pd.DataFrame(data = cm, columns = ['Predicted:0', 'Predicted:1'], index = ['Actual:0', 'Actual:1'])
+plt.figure(figsize = (8, 5))
+sns.heatmap(matrix, annot=True, fmt='d', cmp='YlGnBu')
+plt.show
 
 # 2) ROC curve
-fig, ax = plt.subplots(figsize = (13,5))
-ax.plot(dc_eval['fpr'], dc_eval['tpr'], label='Decision Tree, auc = {:0.5f}'.format(dc_eval['auc']))
-ax.plot(knn_eval['fpr'], knn_eval['tpr'], label='K-Nearest Nieghbor, auc = {:0.5f}'.format(knn_eval['auc']))
-ax.set_xlabel('False Positive Rate', fontweight='bold')
-ax.set_ylabel('True Positive Rate', fontweight='bold')
-ax.set_title('ROC Curve', fontsize=14, fontweight='bold')
-ax.legend(loc=4)
+plot_roc_curve(fper, tper)
 
-plt.show()
