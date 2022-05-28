@@ -11,7 +11,7 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.model_selection import train_test_split
 
 
-from sklearn.preprocessing import OneHotEncoder 
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix
 import warnings 
@@ -84,20 +84,20 @@ sns.countplot( x= df['Race'], hue = 'HeartDisease', data = df, palette = 'pastel
 plt.xlabel('Race')
 plt.ylabel('Frequency')
 fig.suptitle("Distribution of heart disease by Race")
-plt.show()
+#plt.show()
 # Age Category
 plt.figure(figsize = (13,6))
 sns.countplot(x = df['AgeCategory'], hue = 'HeartDisease', data = df, palette = 'pastel')
 fig.suptitle("Distribution of heart disease by AgeCategory")
 plt.xlabel('AgeCategory')
 plt.ylabel('Frequency')
-plt.show()
+#plt.show()
 # Gen Health
 gen =  df['GenHealth'].unique()
 gen_cnt = df['GenHealth'].value_counts()
 sns.barplot(x=gen_cnt,y=gen,data=df, palette = 'pastel')
 fig.suptitle("Distribution of heart disease by AgeCategory")
-plt.show()
+#plt.show()
 
 # KidneyDisease
 fig, ax = plt.subplots(figsize = (13,6))
@@ -143,7 +143,7 @@ ax.set_ylabel("Frequency")
 fig.suptitle("Distribution of heart disease based on previous exposure to Diabetic")
 
 ax.legend();
-
+plt.show()
 
 # 2) Visualization of Numerical Features
 # BMI
@@ -154,7 +154,7 @@ plt.title('Distribution of BMI', fontsize = 16)
 ax.set_xlabel("BodyMass")
 ax.set_ylabel("Frequency")
 ax.legend();
-plt.show()
+#plt.show()
 # Sleep time
 fig, ax = plt.subplots(figsize = (13,5))
 sns.kdeplot(df[df["HeartDisease"]==1]["SleepTime"], alpha=0.5,shade = True, color="#86E57F", label="HeartDisease", ax = ax)
@@ -163,7 +163,7 @@ plt.title('Distribution of SleepTime values', fontsize = 16)
 ax.set_xlabel("SleepTime")
 ax.set_ylabel("Frequency")
 ax.legend();
-plt.show()
+#plt.show()
 # Physical Health
 fig, ax = plt.subplots(figsize = (13,5))
 sns.kdeplot(df[df["HeartDisease"]==1]["PhysicalHealth"], alpha=0.5,shade = True, color="#86E57F", label="HeartDisease", ax = ax)
@@ -172,7 +172,7 @@ plt.title('Distribution of PhysicalHealth state for the last 30 days', fontsize 
 ax.set_xlabel("PhysicalHealth")
 ax.set_ylabel("Frequency")
 ax.legend();
-plt.show()
+#plt.show()
 # Mental Health
 fig, ax = plt.subplots(figsize = (13,5))
 sns.kdeplot(df[df["HeartDisease"]==1]["MentalHealth"], alpha=0.5,shade = True, color="#86E57F", label="HeartDisease", ax = ax)
@@ -194,6 +194,22 @@ plt.figure(figsize = (13,6))
 plt.title('Heatmap correlation of features')
 abs(correlation['HeartDisease']).sort_values()[:-1].plot.barh()
 plt.show()
+
+
+# 7. Encoding for data(for categorical data)
+#enc = OneHotEncoder() 
+enc = LabelEncoder() 
+
+# Encoding categorical features - dataframe name : categ
+encoded_categ = df[['Race']]
+encoded_categ = pd.DataFrame(enc.fit_transform(encoded_categ))
+# Linking the encoed_cateh with the df
+encoded_categ = pd.concat([df, encoded_categ], axis = 1)
+# Dropping the categorical features after encoding
+encoded_categ2 = df[['GenHealth']]
+encoded_categ2 = pd.DataFrame(enc.fit_transform(encoded_categ2))
+encoded_categ = pd.concat([encoded_categ, encoded_categ2], axis = 1)
+encoded_categ = encoded_categ.drop(columns = ['Race', 'GenHealth'], axis = 1)
 
 
 """
@@ -233,29 +249,20 @@ def RobustScaling(columnName,df):
     return df
 
 # Make scaling dataset (for numerical data)
-stTrainData=StandardScaling(['BMI','PhysicalHealth','MentalHealth','AgeCategory','SleepTime'],df)
-mmTrainData=MinMaxScaling(['BMI','PhysicalHealth','MentalHealth','AgeCategory','SleepTime'],df)
-rbTrainData=RobustScaling(['BMI','PhysicalHealth','MentalHealth','AgeCategory','SleepTime'],df)
+stTrainData=StandardScaling(['BMI','PhysicalHealth','MentalHealth','AgeCategory','SleepTime'],encoded_categ)
+mmTrainData=MinMaxScaling(['BMI','PhysicalHealth','MentalHealth','AgeCategory','SleepTime'],encoded_categ)
+rbTrainData=RobustScaling(['BMI','PhysicalHealth','MentalHealth','AgeCategory','SleepTime'],encoded_categ)
 #print(stTrainData.head())
 #print(mmTrainData.head())
 #print(rbTrainData.head())
 
-# 7. Encoding for data(for categorical data)
-enc = OneHotEncoder() 
-
-# Encoding categorical features - dataframe name : categ
-encoded_categ = stTrainData[['Race', 'GenHealth']]
-encoded_categ = pd.DataFrame(enc.fit_transform(encoded_categ).toarray())
-# Linking the encoed_cateh with the df
-encoded_categ = pd.concat([stTrainData, encoded_categ], axis = 1)
-# Dropping the categorical features after encoding
-encoded_categ = encoded_categ.drop(columns = ['Race', 'GenHealth'], axis = 1)
 
 # 8. Prepare for split train dataset and test dataset
 size = 0.2
-data = encoded_categ.drop(['HeartDisease'], axis=1) # drop target data
-target = encoded_categ['HeartDisease']
-
+data = stTrainData.drop(['HeartDisease'], axis=1) # drop target data
+data = data.drop(['SleepTime', 'AlcoholDrinking', 'BMI', 'Sex', 'SkinCancer'], axis = 1) # drop data which has low correlation
+target = stTrainData['HeartDisease']
+print(data)
 
 # 9. Build a model
 ########################################
@@ -271,8 +278,8 @@ train_x, test_x, train_y, test_y = train_test_split(data, target, test_size=size
 kfold = KFold(5, shuffle=True)
 model = tree.DecisionTreeClassifier()
 score = cross_val_score(model, X=train_x, y=train_y, cv=kfold)
-print("cross validation scroes: {}".format(score))
-print("Mean score: {}".format(np.mean(score)))
+print("cross validation scroe: ", score)
+print("Mean score: ", np.mean(score))
 
 model.fit(train_x, train_y)
 pred_y = model.predict(test_x)
@@ -304,13 +311,15 @@ from sklearn.model_selection import GridSearchCV
 
 knn = KNeighborsClassifier()
 train_x, test_x, train_y, test_y = train_test_split(data, target, test_size=size, random_state=34, stratify = target, shuffle=True)
-h_para = {'n_neighbors':np.arange(1, 10, 5)}
+h_param = {'n_neighbors':np.arange(1, 9, 2)} #
+#h_param = {'n_neighbors': [3]} #
 
-grid_knn = GridSearchCV(knn, param_grid=h_para, cv=KFold(5, shuffle=True), refit=True, scoring = "accuracy", return_train_score=True, n_jobs=-1)
+#grid_knn = GridSearchCV(knn, param_grid=h_param, cv=KFold(5, shuffle=True), n_jobs=-1)
+grid_knn = GridSearchCV(knn, param_grid=h_param, cv=KFold(5), n_jobs=-1)
 grid_knn.fit(train_x, train_y)
 pred_y = grid_knn.predict(test_x)
-fper, tper, thresholds = roc_curve(test_y, pred_y)
-print('final params: ', grid_knn.best_params_)
+# fper, tper, thresholds = roc_curve(test_y, pred_y)
+print('best params: ', grid_knn.best_params_)
 print('best score: ', grid_knn.best_score_)
 print('best estimator: ', grid_knn.best_estimator_)
 
@@ -319,8 +328,8 @@ print('best estimator: ', grid_knn.best_estimator_)
 cm = confusion_matrix(test_y, pred_y)
 matrix = pd.DataFrame(data = cm, columns = ['Predicted:0', 'Predicted:1'], index = ['Actual:0', 'Actual:1'])
 plt.figure(figsize = (8, 5))
-sns.heatmap(matrix, annot=True, fmt='d', cmp='YlGnBu')
-plt.show
+sns.heatmap(matrix, annot=True, fmt='d')
+plt.show()
 
 # 2) ROC curve
 plot_roc_curve(fper, tper)
