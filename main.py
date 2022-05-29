@@ -1,5 +1,4 @@
 # 1. importing library
-from codecs import ignore_errors
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -11,9 +10,9 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.model_selection import train_test_split
 
 
-from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from sklearn.preprocessing import LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import confusion_matrix
+
 import warnings 
 warnings.filterwarnings("ignore")
 
@@ -26,6 +25,7 @@ Data exploration(For dataset description)
 # 3. Data cleaning - set NaN values and check with isnull()
 df['Diabetic'] = df['Diabetic'].replace('No, borderline diabetes', np.NaN)
 df['Diabetic'] = df['Diabetic'].replace('Yes (during pregnancy)', np.NaN)
+# check number of NaN values created
 print(df.isnull().sum().sort_values(ascending=False))
 
 # 4. Data inspection
@@ -57,27 +57,38 @@ df['AgeCategory'] = df['AgeCategory'].replace('70-74', 72)
 df['AgeCategory'] = df['AgeCategory'].replace('75-79', 77)
 df['AgeCategory'] = df['AgeCategory'].replace('80 or older', 80)
 
-
 # 6. Data Visualization
+def histo_visualize(data, feature):
+    #fig, ax = plt.subplots(figsize = (13, 6))
+    ax.hist(df[df["HeartDisease"]==1][feature], bins=10, alpha=0.5, color="#86E57F", label="HeartDisease")
+    ax.hist(df[df["HeartDisease"]==0][feature], bins=10, alpha=0.5, color="#FFB2D9", label="Normal")
+    fig.suptitle("Distribution of heart disease by " + feature)
+    ax.set_xlabel(feature)
+    ax.set_ylabel("Frequency")
+    ax.legend();
+    return data
+
+fig, ax = plt.subplots(figsize = (13, 6))
+histo_visualize(df, 'Sex')
 # 1) Visualization of Categorical features
 # Sex
-fig, ax = plt.subplots(figsize = (13, 6))
-ax.hist(df[df["HeartDisease"]==1]["Sex"], bins=10, alpha=0.5, color="#86E57F", label="HeartDisease")
-ax.hist(df[df["HeartDisease"]==0]["Sex"], bins=10, alpha=0.5, color="#FFB2D9", label="Normal")
+#fig, ax = plt.subplots(figsize = (13, 6))
+#ax.hist(df[df["HeartDisease"]==1]["Sex"], bins=2, alpha=0.5, color="#86E57F", label="HeartDisease")
+#ax.hist(df[df["HeartDisease"]==0]["Sex"], bins=2, alpha=0.5, color="#FFB2D9", label="Normal")
+#ax.set_xlabel("Sex")
+#ax.set_ylabel("Frequency")
+#fig.suptitle("Distribution of heart disease by Sex")
+#ax.legend();
 
-ax.set_xlabel("Sex")
-ax.set_ylabel("Frequency")
-fig.suptitle("Distribution of heart disease by Sex")
-ax.legend();
 # Smoking
 fig, ax = plt.subplots(figsize = (13,6))
-
 ax.hist(df[df["HeartDisease"]==1]["Smoking"], bins=10, alpha=0.5, color="#86E57F", label="HeartDisease")
 ax.hist(df[df["HeartDisease"]==0]["Smoking"], bins=10, alpha=0.5, color="#FFB2D9", label="Normal")
 ax.set_xlabel("Smoking")
 ax.set_ylabel("Frequency")
 fig.suptitle("Distribution of heart disease by Smoking")
 ax.legend();
+
 # Race
 plt.figure(figsize = (13,6))
 sns.countplot( x= df['Race'], hue = 'HeartDisease', data = df, palette = 'pastel')
@@ -252,85 +263,130 @@ def RobustScaling(columnName,df):
 stTrainData=StandardScaling(['BMI','PhysicalHealth','MentalHealth','AgeCategory','SleepTime'],encoded_categ)
 mmTrainData=MinMaxScaling(['BMI','PhysicalHealth','MentalHealth','AgeCategory','SleepTime'],encoded_categ)
 rbTrainData=RobustScaling(['BMI','PhysicalHealth','MentalHealth','AgeCategory','SleepTime'],encoded_categ)
-#print(stTrainData.head())
-#print(mmTrainData.head())
-#print(rbTrainData.head())
 
+data_list = [stTrainData, mmTrainData, rbTrainData]
+low_col = ['SleepTime', 'AlcoholDrinking', 'BMI', 'Sex', 'SkinCancer']
+size = 0.2
+
+
+# Use 3 normalized data
+
+from sklearn import tree
+from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold
+from sklearn.model_selection import GridSearchCV
+
+
+"""
+Show confusion matrix figure
+input : test data, predict data
+output : none
+"""
+def build_cm(test, predict):
+    cm = confusion_matrix(test, predict)
+    matrix = pd.DataFrame(data = cm, columns = ['Predicted:0', 'Predicted:1'], index = ['Actual:0', 'Actual:1'])
+    plt.figure(figsize = (8, 5))
+    sns.heatmap(matrix, annot=True, fmt='d')
+    plt.show()
+
+
+for i in range(3):
+    # 8. Prepare for split train dataset and test dataset
+    data = data_list[i].drop(['HeartDisease'], axis=1) # drop target data
+    data = data.drop(low_col, axis = 1) # drop data which has low correlation
+    target = data_list[i]['HeartDisease']
+
+    train_x, test_x, train_y, test_y = train_test_split(data, target, test_size=size, random_state=34, stratify = target, shuffle=True)
+    # 9. Build a model
+    # 1) Decision Tree model & KFold validation
+    kfold = KFold(5, shuffle=True)
+    dec = tree.DecisionTreeClassifier()
+    score = cross_val_score(dec, X=train_x, y=train_y, cv=kfold) #train and predict
+
+    # 10. Model evalution
+    # 1) Find validation score
+    print("cross validation scroe: ", score)
+    print("Mean score: ", np.mean(score))
+
+    # 2) Confusion matrix
+    dec.fit(train_x, train_y)
+    pred_y = dec.predict(test_x)
+    build_cm(test_y, pred_y)
+
+    ########################################
+    # 9. Build a model
+    # 2) KNN classifier model & GridSearchCV
+    knn = KNeighborsClassifier()
+    h_param = {'n_neighbors':np.arange(1, 10, 2)} #list [1, 3, 5, 7, 9]
+    
+    grid_knn = GridSearchCV(knn, param_grid=h_param, cv=KFold(5), n_jobs=-1)
+    grid_knn.fit(train_x, train_y)
+    # 10. Model evalution
+    # 1) Find best n_neighbors
+    print('best params: ', grid_knn.best_params_)
+    print('best score: ', grid_knn.best_score_)
+    print('best estimator: ', grid_knn.best_estimator_)
+    # 2) Confusion matrix
+    build_cm(test_y, grid_knn.predict(test_x))
+
+
+
+    
 
 # 8. Prepare for split train dataset and test dataset
-size = 0.2
-data = stTrainData.drop(['HeartDisease'], axis=1) # drop target data
-data = data.drop(['SleepTime', 'AlcoholDrinking', 'BMI', 'Sex', 'SkinCancer'], axis = 1) # drop data which has low correlation
-target = stTrainData['HeartDisease']
-print(data)
+#data = stTrainData.drop(['HeartDisease'], axis=1) # drop target data
+#data = data.drop(['SleepTime', 'AlcoholDrinking', 'BMI', 'Sex', 'SkinCancer'], axis = 1) # drop data which has low correlation
+#target = stTrainData['HeartDisease']
 
 # 9. Build a model
 ########################################
 # 1) Decision Tree model & KFold validation
-from sklearn import tree
-from sklearn import metrics
-from sklearn.metrics import roc_curve
-from sklearn.model_selection import cross_val_score
-
-from sklearn.model_selection import KFold
-
-train_x, test_x, train_y, test_y = train_test_split(data, target, test_size=size, random_state=34, stratify = target, shuffle=True)
-kfold = KFold(5, shuffle=True)
-model = tree.DecisionTreeClassifier()
-score = cross_val_score(model, X=train_x, y=train_y, cv=kfold)
-print("cross validation scroe: ", score)
-print("Mean score: ", np.mean(score))
-
-model.fit(train_x, train_y)
-pred_y = model.predict(test_x)
-fper, tper, thresholds = roc_curve(test_y, pred_y)
-score = metrics.roc_auc_score(test_y,pred_y)
-print(score)
+#size = 0.2
+#train_x, test_x, train_y, test_y = train_test_split(data, target, test_size=size, random_state=34, stratify = target, shuffle=True)
+#kfold = KFold(5, shuffle=True)
+#model = tree.DecisionTreeClassifier()
+#score = cross_val_score(model, X=train_x, y=train_y, cv=kfold) #train and predict
 # 10. Model evalution
-# 1) Confusion matrix
-cm = confusion_matrix(test_y, pred_y)
-matrix = pd.DataFrame(data = cm, columns = ['Predicted:0', 'Predicted:1'], index = ['Actual:0', 'Actual:1'])
-plt.figure(figsize = (8, 5))
-sns.heatmap(matrix, annot=True, fmt='d')
-plt.show()
-# 2) ROC curve
-def plot_roc_curve(fper, tper):
-    plt.plot(fper, tper, color='red', label='ROC')
-    plt.plot([0, 1], [0, 1], color='green', linestyle='--')
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic Curve')
-    plt.legend()
-    plt.show()
+# 1) Find validation score
+#print("cross validation scroe: ", score)
+#print("Mean score: ", np.mean(score))
 
-plot_roc_curve(fper, tper)
+#model.fit(train_x, train_y)
+#pred_y = model.predict(test_x)
+
+# 2) Confusion matrix
+#cm = confusion_matrix(test_y, model.predict(test_x))
+#matrix = pd.DataFrame(data = cm, columns = ['Predicted:0', 'Predicted:1'], index = ['Actual:0', 'Actual:1'])
+#plt.figure(figsize = (8, 5))
+#sns.heatmap(matrix, annot=True, fmt='d')
+#plt.show()
+
 
 ########################################
 # 2) KNN classifier model & GridSearchCV
-from sklearn.model_selection import GridSearchCV
-
+'''
 knn = KNeighborsClassifier()
 train_x, test_x, train_y, test_y = train_test_split(data, target, test_size=size, random_state=34, stratify = target, shuffle=True)
-h_param = {'n_neighbors':np.arange(1, 9, 2)} #
-#h_param = {'n_neighbors': [3]} #
+h_param = {'n_neighbors':np.arange(1, 10, 2)} #list [1, 3, 5, 7, 9]
 
-#grid_knn = GridSearchCV(knn, param_grid=h_param, cv=KFold(5, shuffle=True), n_jobs=-1)
-grid_knn = GridSearchCV(knn, param_grid=h_param, cv=KFold(5), n_jobs=-1)
+grid_knn = GridSearchCV(knn, param_grid=h_param, cv=KFold(5), score='accuracy', n_jobs=-1)
 grid_knn.fit(train_x, train_y)
 pred_y = grid_knn.predict(test_x)
-# fper, tper, thresholds = roc_curve(test_y, pred_y)
+
+# 10. Model evalution
+# 1) Find best n_neighbors
 print('best params: ', grid_knn.best_params_)
 print('best score: ', grid_knn.best_score_)
 print('best estimator: ', grid_knn.best_estimator_)
 
-# 10. Model evalution
-# 1) Confusion matrix
+
+# 2) Confusion matrix
 cm = confusion_matrix(test_y, pred_y)
 matrix = pd.DataFrame(data = cm, columns = ['Predicted:0', 'Predicted:1'], index = ['Actual:0', 'Actual:1'])
 plt.figure(figsize = (8, 5))
 sns.heatmap(matrix, annot=True, fmt='d')
 plt.show()
 
-# 2) ROC curve
-plot_roc_curve(fper, tper)
 
+'''
