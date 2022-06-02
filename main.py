@@ -152,8 +152,8 @@ sns.kdeplot(df[df["HeartDisease"]==0]["BMI"], alpha=0.5,shade = True, color="#FF
 plt.title('Distribution of BMI', fontsize = 16)
 ax.set_xlabel("BodyMass")
 ax.set_ylabel("Frequency")
-ax.legend();
-#plt.show()
+ax.legend()
+
 # Sleep time
 fig, ax = plt.subplots(figsize = (13,5))
 sns.kdeplot(df[df["HeartDisease"]==1]["SleepTime"], alpha=0.5,shade = True, color="#86E57F", label="HeartDisease", ax = ax)
@@ -161,8 +161,8 @@ sns.kdeplot(df[df["HeartDisease"]==0]["SleepTime"], alpha=0.5,shade = True, colo
 plt.title('Distribution of SleepTime values', fontsize = 16)
 ax.set_xlabel("SleepTime")
 ax.set_ylabel("Frequency")
-ax.legend();
-#plt.show()
+ax.legend()
+
 # Physical Health
 fig, ax = plt.subplots(figsize = (13,5))
 sns.kdeplot(df[df["HeartDisease"]==1]["PhysicalHealth"], alpha=0.5,shade = True, color="#86E57F", label="HeartDisease", ax = ax)
@@ -170,8 +170,8 @@ sns.kdeplot(df[df["HeartDisease"]==0]["PhysicalHealth"], alpha=0.5,shade = True,
 plt.title('Distribution of PhysicalHealth state for the last 30 days', fontsize = 16) 
 ax.set_xlabel("PhysicalHealth")
 ax.set_ylabel("Frequency")
-ax.legend();
-#plt.show()
+ax.legend()
+
 # Mental Health
 fig, ax = plt.subplots(figsize = (13,5))
 sns.kdeplot(df[df["HeartDisease"]==1]["MentalHealth"], alpha=0.5,shade = True, color="#86E57F", label="HeartDisease", ax = ax)
@@ -179,7 +179,7 @@ sns.kdeplot(df[df["HeartDisease"]==0]["MentalHealth"], alpha=0.5,shade = True, c
 plt.title('Distribution of MenalHealth state for the last 30 days', fontsize = 16)
 ax.set_xlabel("MentalHealth")
 ax.set_ylabel("Frequency")
-ax.legend();
+ax.legend()
 plt.show()
 
 # 3) Check correlation with heatmap
@@ -282,6 +282,8 @@ for i in range(3):
     target = data_list[i]['HeartDisease']
 
     train_x, test_x, train_y, test_y = train_test_split(data, target, test_size=size, random_state=34, stratify = target, shuffle=True)
+
+    #######################################################
     # 10. Build a model
     # 1) Random Forest Regressor model & GridSearchCV
     f_param = {'n_estimators':(100, 200), 'max_depth':(5, 8), 'min_samples_leaf':(8, 18), 'min_samples_split':(5, 10)}
@@ -289,7 +291,8 @@ for i in range(3):
     grid_rf = GridSearchCV(rf, param_grid=f_param, cv=KFold(5), n_jobs=-1)
     grid_rf.fit(train_x, train_y)
     # 11. Model evalution
-    # 1) Find best n_neighbors
+    # 1) Find best score 
+    print("Model 1. RandomForest Regression")
     print('best params: ', grid_rf.best_params_)
     print('best score: ', grid_rf.best_score_)
     print('best estimator: ', grid_rf.best_estimator_)
@@ -303,6 +306,7 @@ for i in range(3):
 
     # 11. Model evalution
     # 1) Find validation score
+    print("Model 2. Decision Tree")
     print("cross validation scroe: ", score)
     print("Mean score: ", np.mean(score))
 
@@ -320,7 +324,8 @@ for i in range(3):
     grid_knn = GridSearchCV(knn, param_grid=h_param, cv=KFold(5), n_jobs=-1)
     grid_knn.fit(train_x, train_y)
     # 11. Model evalution
-    # 1) Find best n_neighbors
+    # 1) Find best score
+    print("Model 3. KNN classifier")
     print('best params: ', grid_knn.best_params_)
     print('best score: ', grid_knn.best_score_)
     print('best estimator: ', grid_knn.best_estimator_)
