@@ -130,6 +130,7 @@ Model : ***RandomForest Regressor, Decision Tree Classifier, KNeighbors Classifi
   grid_knn = GridSearchCV(knn, param_grid=h_param, cv=KFold(5), n_jobs=-1)
   grid_knn.fit(train_x, train_y)
 ```
+***
 
 6️⃣**Data Evaluation**
 >For evaluation, we used ***gridSearchCV and KFold model***.
@@ -161,6 +162,7 @@ def build_cm(test, predict):
 #use
 build_cm(test_y, pred_y)
 ```
+***
 
 7️⃣**Result**
 >Prediction accuracy
@@ -180,7 +182,7 @@ There are several researchers that suggest that various environmental and geneti
 and *these factors are not reflected in the dataset.*
 
 **For realistic analysis, a process of finding and studying papers or other analyses to refer to is necessary.**
-
+***
 8️⃣**Reference**
 1. <https://www.kaggle.com/code/ahmadsoliman94/heart-disease-prediction-rf-93>
 2. <https://www.kaggle.com/code/andls555/heart-disease-prediction/notebook>
